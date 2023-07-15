@@ -1,49 +1,35 @@
 import pandas as pd
-import shutil
-from glob import glob
 from pyannote.audio import Pipeline
 
+def diarize(stream):
+    # Load the pre-trained diarization pipeline
+    pipeline = Pipeline.from_pretrained(
+        "pyannote/speaker-diarization",
+        use_auth_token="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"
+    )
 
-##Unneccesery for steaming
-file = 'output-trim.wav'
-##Unneccesery for steaming
-def read_file(filename, chunk_size=5242880):
-    with open(filename, 'rb') as _file:
-        while True:
-            data = _file.read(chunk_size)
-            if not data:
-                break
-            yield data
-            
+    # Perform diarization on the input audio stream
+    diarization = pipeline(stream)
 
-def diarize(file):
-
-    ##Unneccesery for steaming
-    shutil.copy(file, 'audio_in/')
-
-    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization",
-                                    use_auth_token="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")
-
-    diarization = pipeline(file)
+    # Convert the diarization result to a JSON object
     diar_json = diarization.for_json()
-    diar_df = pd.DataFrame.from_dict(diar_json['content'])
 
-    diar_df['start'] = [diar_df['segment'][i]['start'] for i in range(len(diar_df['segment']))]
-    diar_df['end'] = [diar_df['segment'][i]['end'] for i in range(len(diar_df['segment']))]
-    diar_df = diar_df[['label', 'start', 'end']]
+    # Convert the JSON object to a DataFrame
+    diar_df = pd.DataFrame.from_dict(diar_json["content"])
 
-    d = {'label': 'first', 'start': 'min', 'end': 'max'}   # How to aggregate
-    s = diar_df.label.ne(diar_df.label.shift(1)).cumsum().rename(None) # How to group
-    print(diar_df)
+    # Extract the start and end times for each segment
+    diar_df["start"] = [diar_df["segment"][i]["start"] for i in range(len(diar_df["segment"]))]
+    diar_df["end"] = [diar_df["segment"][i]["end"] for i in range(len(diar_df["segment"]))]
+    diar_df = diar_df[["label", "start", "end"]]
+
+    # Define how to aggregate and group the segments
+    d = {"label": "first", "start": "min", "end": "max"}  # How to aggregate
+    s = diar_df.label.ne(diar_df.label.shift(1)).cumsum().rename(None)  # How to group
     diar_df = diar_df.groupby(s).agg(d)
 
-
-    
+    # Reset the index and rename the columns
     diar_df.reset_index(inplace=True)
-    diar_df = diar_df[['label', 'start', 'end']]
-    diar_df.columns = ['Speaker', 'sent_start', 'sent_end']
-
+    diar_df = diar_df[["label", "start", "end"]]
+    diar_df.columns = ["Speaker", "sent_start", "sent_end"]
 
     return diar_df
-
-diarize(file=file)
