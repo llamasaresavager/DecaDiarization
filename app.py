@@ -13,14 +13,12 @@ async def diarize_audio(files: List[UploadFile]):
     file = files[0]
     if file.content_type != "audio/wav":
         raise HTTPException(status_code=400, detail="Only WAV files are supported.")
-
-    with NamedTemporaryFile(delete=True) as temp_file:
-        # Save the uploaded file to a temporary location
-        contents = await file.read()
-        temp_file.write(contents)
-        temp_file.seek(0)
-
+    
+    with file.file as fx:
+        fx.seek(0)
+        # x= fx.read(10)
+        # diarization_result = x
         # Perform diarization on the temporary file stream
-        diarization_result = diarize(stream=temp_file)
+        diarization_result = diarize(stream=fx)
 
-        return diarization_result
+    return diarization_result

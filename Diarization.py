@@ -1,15 +1,25 @@
 import pandas as pd
-from pyannote.audio import Pipeline
+from pyannote.audio import Pipeline, Audio
+import tempfile
+import soundfile as sf
 
 def diarize(stream):
+    # Save the audio_data to a temporary .wav file
+    temp_file = tempfile.NamedTemporaryFile(delete=True, suffix=".wav")
+    sf.write(temp_file.name, audio_data, 44100)
+
+
     # Load the pre-trained diarization pipeline
     pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization",
         use_auth_token="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"
     )
 
+    # Perform diarization on the temporary audio file
+    diarization = pipeline(temp_file.name)
+
     # Perform diarization on the input audio stream
-    diarization = pipeline(stream)
+    diarization = pipeline(x)
 
     # Convert the diarization result to a JSON object
     diar_json = diarization.for_json()
