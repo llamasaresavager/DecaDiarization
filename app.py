@@ -68,4 +68,3 @@ async def transcribe_audio(
 @app.get("/status")
 async def read_status():
     return {"status": "OK"}
-

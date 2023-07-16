@@ -13,13 +13,13 @@ def diarize(stream):
         with tempfile.NamedTemporaryFile(delete=True, suffix=".wav") as temp_file:
             temp_file.write(stream)
             
-            HUFFINGFACE_API_KEY = os.environ.get("HUFFINGFACE_API_KEY")
-            if not HUFFINGFACE_API_KEY:
-                raise Exception("Environment variable HUFFINGFACE_API_KEY is not set")
+            HUGGINGFACE_API_KEY = os.environ.get("HUGGINGFACE_API_KEY")
+            if not HUGGINGFACE_API_KEY:
+                raise Exception("Environment variable HUGGINGFACE_API_KEY is not set")
             
             pipeline = Pipeline.from_pretrained(
                 "pyannote/speaker-diarization",
-                use_auth_token=HUFFINGFACE_API_KEY
+                use_auth_token=HUGGINGFACE_API_KEY
             )
 
             diarization = pipeline(temp_file.name)
