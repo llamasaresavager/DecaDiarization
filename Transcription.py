@@ -1,72 +1,96 @@
+from noisereduce import reduce_noise
+from soundfile import read, _error_check
+from librosa.effects import trim
+from librosa.util import normalize
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
-import soundfile as sf
+from torch import cuda, device
 import io
-import torch
-import librosa
-import noisereduce as nr
+import numpy as np
+import logging
 
-def transcribe_audio_file(audio_stream, diarization_result, audio_id=None, timestamp=None, do_diarize=True, chunk_size_sec=5):
-    # Check if a GPU is available and if not, use a CPU
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Read the audio stream with soundfile
-    raw_data, samplerate = sf.read(io.BytesIO(audio_stream))
+logging.basicConfig(level=logging.INFO)
 
-    # Reduce noise
-    data = nr.reduce_noise(y=raw_data, sr=samplerate)
 
-    # Minor preprocessing with Librosa
-    data, _ = librosa.effects.trim(data)  # Trim leading and trailing silence
-    data = librosa.util.normalize(data)  # Normalize amplitude to range [-1, 1]
+class Transcriber:
+    CHUNK_SIZE_SEC = 5
+    MODEL_NAME = "openai/whisper-large-v2"
 
-    # Load model and processor
-    processor = WhisperProcessor.from_pretrained("openai/whisper-large-v2")
-    model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-large-v2").to(device)
+    def __init__(self):
+        """
+        Initialize the Transcriber with the appropriate model and processor.
+        """
+        self.device = device("cuda" if cuda.is_available() else "cpu")
+        self.processor = WhisperProcessor.from_pretrained(self.MODEL_NAME)
+        self.model = WhisperForConditionalGeneration.from_pretrained(self.MODEL_NAME).to(self.device)
 
-    # Prepare the transcript JSON object
-    transcript_json = []
+    def _preprocess_audio(self, audio_stream: bytes) -> np.array:
+        """
+        Preprocess audio data by reducing noise and normalizing volume.
 
-    if do_diarize:
-        # Process the audio in chunks based on diarization result
+        Parameters:
+            audio_stream (bytes): The audio data to preprocess.
+
+        Returns:
+            np.array: The preprocessed audio data.
+        """
+        try:
+            raw_data, samplerate = read(io.BytesIO(audio_stream))
+            data = reduce_noise(y=raw_data, sr=samplerate)
+            data, _ = trim(data) 
+            data = normalize(data)
+            return data, samplerate
+        except _error_check as e:
+            logging.error(f"Error reading audio file: {e}")
+            raise
+        except Exception as e:
+            logging.error(f"Error during preprocessing: {e}")
+            raise
+
+    def _transcribe_chunk(self, chunk: np.array, samplerate: int, speaker: str, audio_id: str, timestamp: str) -> list:
+        """
+        Transcribe an audio chunk using the Whisper ASR model.
+
+        Parameters:
+            chunk (np.array): The audio chunk to transcribe.
+            samplerate (int): The samplerate of the audio chunk.
+            speaker (str): The speaker of the audio chunk.
+            audio_id (str): An ID for the audio chunk.
+            timestamp (str): A timestamp for the audio chunk.
+
+        Returns:
+            list: The transcription results.
+        """
+        input_features = self.processor(chunk, sampling_rate=samplerate, return_tensors="pt").input_features.to(self.device)
+        predicted_ids = self.model.generate(input_features)
+        transcriptions = self.processor.batch_decode(predicted_ids.cpu(), skip_special_tokens=True, clean_up_tokenization_spaces=True)
+        transcript_chunk = [{"audio_id": audio_id, "timestamp": timestamp, "Speaker": speaker, "transcription": t} for t in transcriptions]
+        return transcript_chunk
+
+    def _process_diarization(self, data, samplerate, diarization_result, audio_id, timestamp):
+        transcript_json = []
         for segment in diarization_result:
             start_sample = int(segment["sent_start"] * samplerate)
             end_sample = int(segment["sent_end"] * samplerate)
             chunk = data[start_sample:end_sample]
-
-            # Process this chunk
-            transcript_chunk = transcribe_chunk(processor, model, device, chunk, samplerate, segment["Speaker"], audio_id, timestamp)
+            transcript_chunk = self._transcribe_chunk(chunk, samplerate, segment["Speaker"], audio_id, timestamp)
             transcript_json.extend(transcript_chunk)
-    else:
-        # Without diarization, chunk the audio by fixed time segments
+        return transcript_json
+
+    def _process_without_diarization(self, data, samplerate, chunk_size_sec, audio_id, timestamp):
+        transcript_json = []
         total_samples = len(data)
         chunk_size_samples = chunk_size_sec * samplerate
         for start_sample in range(0, total_samples, chunk_size_samples):
             end_sample = min(start_sample + chunk_size_samples, total_samples)
             chunk = data[start_sample:end_sample]
-
-            # Process this chunk
-            transcript_chunk = transcribe_chunk(processor, model, device, chunk, samplerate, "Unknown", audio_id, timestamp)
+            transcript_chunk = self._transcribe_chunk(chunk, samplerate, "Unknown", audio_id, timestamp)
             transcript_json.extend(transcript_chunk)
+        return transcript_json
 
-    return transcript_json
-
-
-def transcribe_chunk(processor, model, device, chunk, samplerate, speaker, audio_id, timestamp):
-    # Transcribe the audio chunk directly without involving dataset splits
-    input_features = processor(chunk, sampling_rate=samplerate, return_tensors="pt").input_features.to(device)
-
-    # Generate token ids
-    predicted_ids = model.generate(input_features)
-
-    # Decode token ids to text
-    transcriptions = processor.batch_decode(predicted_ids.cpu(), skip_special_tokens=True, clean_up_tokenization_spaces=True)
-
-    # Append the transcriptions for this chunk
-    transcript_chunk = [{
-        "audio_id": audio_id,        # ID or name of the audio stream (optional)
-        "timestamp": timestamp,      # Timestamp of the audio stream (optional)
-        "Speaker": speaker,          # Speaker for this segment
-        "transcription": t           # Transcribed text for the segment
-    } for t in transcriptions]
-
-    return transcript_chunk
+    def transcribe_audio_file(self, audio_stream: bytes, diarization_result: list, audio_id: str=None, timestamp: str=None, do_diarize: bool=True, chunk_size_sec: int=CHUNK_SIZE_SEC) -> list:
+        data, samplerate = self._preprocess_audio(audio_stream)
+        if do_diarize:
+            return self._process_diarization(data, samplerate, diarization_result, audio_id, timestamp)
+        else:
+            return self._process_without_diarization(data, samplerate, chunk_size_sec, audio_id, timestamp)
