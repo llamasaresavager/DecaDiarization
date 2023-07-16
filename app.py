@@ -18,26 +18,24 @@ class Transcript(BaseModel):
 
 app = FastAPI()
 
+def validate_file_type(file: UploadFile):
+    if file.content_type != "audio/wav":
+        raise HTTPException(status_code=400, detail="File must be a .wav file")
+
 @app.post("/diarize", response_model=List[Segment])
 async def diarization(file: UploadFile = File(...)):
     try:
-        # Ensure the file type is correct
-        if file.content_type != "audio/wav":
-            raise HTTPException(status_code=400, detail="File must be a .wav file")
+        validate_file_type(file)
 
-        # Perform diarization
         diar_df = diarize(await file.read())
 
-        # Convert the DataFrame to a list of dicts
         diar_list = diar_df.to_dict(orient='records')
 
         return JSONResponse(content=diar_list)
 
     except Exception as e:
-        # Capture the full exception traceback and raise as HTTPException
         tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
         raise HTTPException(status_code=500, detail="".join(tb_str))
-
 
 @app.post("/transcribe", response_model=List[Transcript])
 async def transcribe_audio(
@@ -45,24 +43,23 @@ async def transcribe_audio(
     do_diarize: Optional[bool] = Query(default=True, description="Perform diarization for chunking audio size"),
 ):
     try:
-        # Ensure the file type is correct
-        if file.content_type != "audio/wav":
-            raise HTTPException(status_code=400, detail="File must be a .wav file")
+        validate_file_type(file)
 
-        # Read the file contents
         file_contents = await file.read()
 
-        # Perform diarization if do_diarize is True
-        diar_df = None
-        if do_diarize:
-            diar_df = diarize(file_contents)
+        diar_df = diarize_file(file_contents) if do_diarize else None
 
-        # Perform transcription
         transcript = transcribe_audio_file(file_contents, diar_df.to_dict(orient='records') if diar_df is not None and not diar_df.empty else None, do_diarize=do_diarize)
 
         return JSONResponse(content=transcript)
 
     except Exception as e:
-        # Capture the full exception traceback and raise as HTTPException
         tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
         raise HTTPException(status_code=500, detail="".join(tb_str))
+
+def diarize_file(file_contents):
+    try:
+        return diarize(file_contents)
+    except Exception as e:
+        tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
+        raise HTTPException(status_code=400, detail="".join(tb_str))
