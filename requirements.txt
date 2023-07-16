@@ -4,7 +4,10 @@ pyannote.audio==2.1.1
 pandas>=1.4
 python-multipart==0.0.6
 transformers
-datasets
 soundfile
+librosa
+noisereduce
+numpy==1.21.0
+
 
 

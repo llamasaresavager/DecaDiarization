@@ -2,13 +2,22 @@ from transformers import WhisperProcessor, WhisperForConditionalGeneration
 import soundfile as sf
 import io
 import torch
+import librosa
+import noisereduce as nr
 
 def transcribe_audio_file(audio_stream, audio_id=None, timestamp=None):
     # Check if a GPU is available and if not, use a CPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Read the audio stream with soundfile
-    data, samplerate = sf.read(io.BytesIO(audio_stream))
+    raw_data, samplerate = sf.read(io.BytesIO(audio_stream))
+
+    # Reduce noise
+    data = nr.reduce_noise(y=raw_data, sr=samplerate)
+
+    # Minor preprocessing with Librosa
+    data, _ = librosa.effects.trim(data)  # Trim leading and trailing silence
+    data = librosa.util.normalize(data)  # Normalize amplitude to range [-1, 1]
 
     # Load model and processor
     processor = WhisperProcessor.from_pretrained("openai/whisper-large-v2")
