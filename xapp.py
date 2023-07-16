@@ -2,7 +2,9 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from typing import List
 from pydantic import BaseModel
-import traceback
+import soundfile as sf
+from io import BytesIO
+import numpy as np
 
 # Import the function from Diarization.py
 from Diarization import diarize
@@ -21,8 +23,11 @@ async def diarization(file: UploadFile = File(...)):
         if file.content_type != "audio/wav":
             raise HTTPException(status_code=400, detail="File must be a .wav file")
 
+        # Load the audio data
+        audio_data, sample_rate = sf.read(BytesIO(await file.read()))
+
         # Perform diarization
-        diar_df = diarize(await file.read())
+        diar_df = diarize(audio_data)
 
         # Convert the DataFrame to a list of dicts
         diar_list = diar_df.to_dict(orient='records')
@@ -30,6 +35,4 @@ async def diarization(file: UploadFile = File(...)):
         return JSONResponse(content=diar_list)
 
     except Exception as e:
-        # Capture the full exception traceback and raise as HTTPException
-        tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
-        raise HTTPException(status_code=500, detail="".join(tb_str))
+        raise HTTPException(status_code=500, detail=str(e))
