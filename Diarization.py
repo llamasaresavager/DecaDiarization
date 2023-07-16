@@ -1,44 +1,53 @@
+import os
+import traceback
 import pandas as pd
 from pyannote.audio import Pipeline, Audio
 import tempfile
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def diarize(stream):
-    # Save the audio_data to a temporary .wav file
-    temp_file = tempfile.NamedTemporaryFile(delete=True, suffix=".wav")
-    # sf.write(temp_file.name, stream, 16000 )
+    try:
+        with tempfile.NamedTemporaryFile(delete=True, suffix=".wav") as temp_file:
+            temp_file.write(stream)
+            
+            huffingface_auth_token = os.environ.get("HUFFINGFACE_AUTH_TOKEN")
+            if not huffingface_auth_token:
+                raise Exception("Environment variable HUFFINGFACE_AUTH_TOKEN is not set")
+            
+            pipeline = Pipeline.from_pretrained(
+                "pyannote/speaker-diarization",
+                use_auth_token=huffingface_auth_token
+            )
 
-    temp_file.write(stream)
+            diarization = pipeline(temp_file.name)
+            diar_json = diarization.for_json()
+            return json_to_df(diar_json)
 
-        
-    # Load the pre-trained diarization pipeline
-    pipeline = Pipeline.from_pretrained(
-        "pyannote/speaker-diarization",
-        use_auth_token="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"
-    )
+    except Exception as e:
+        tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
+        raise Exception("".join(tb_str))
 
-    # Perform diarization on the temporary audio file
-    diarization = pipeline(temp_file.name)
+def json_to_df(diar_json):
+    segments = diar_json["content"]
+    df = pd.DataFrame(segments)
 
-    # Convert the diarization result to a JSON object
-    diar_json = diarization.for_json()
+    df['start'] = df['segment'].apply(lambda x: x['start'])
+    df['end'] = df['segment'].apply(lambda x: x['end'])
 
-    # Convert the JSON object to a DataFrame
-    diar_df = pd.DataFrame.from_dict(diar_json["content"])
+    df.drop(columns=['segment'], inplace=True)
 
-    # Extract the start and end times for each segment
-    diar_df["start"] = [diar_df["segment"][i]["start"] for i in range(len(diar_df["segment"]))]
-    diar_df["end"] = [diar_df["segment"][i]["end"] for i in range(len(diar_df["segment"]))]
-    diar_df = diar_df[["label", "start", "end"]]
+    df = df.groupby((df['label'] != df['label'].shift(1)).cumsum()).agg({
+        'label': 'first',
+        'start': 'min',
+        'end': 'max',
+    })
 
-    # Define how to aggregate and group the segments
-    d = {"label": "first", "start": "min", "end": "max"}  # How to aggregate
-    s = diar_df.label.ne(diar_df.label.shift(1)).cumsum().rename(None)  # How to group
-    diar_df = diar_df.groupby(s).agg(d)
+    df.reset_index(drop=True, inplace=True)
 
-    # Reset the index and rename the columns
-    diar_df.reset_index(inplace=True)
-    diar_df = diar_df[["label", "start", "end"]]
-    diar_df.columns = ["Speaker", "sent_start", "sent_end"]
+    df.rename(columns={'label': 'Speaker', 'start': 'sent_start', 'end': 'sent_end'}, inplace=True)
 
-    return diar_df
+    return df
