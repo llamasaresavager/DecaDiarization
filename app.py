@@ -1,6 +1,6 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.responses import JSONResponse
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 import traceback
 from Diarization import diarize
@@ -40,7 +40,10 @@ async def diarization(file: UploadFile = File(...)):
 
 
 @app.post("/transcribe", response_model=List[Transcript])
-async def transcribe_audio(file: UploadFile = File(...)):
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    do_diarize: Optional[bool] = Query(default=True, description="Perform diarization for chunking audio size"),
+):
     try:
         # Ensure the file type is correct
         if file.content_type != "audio/wav":
@@ -49,11 +52,13 @@ async def transcribe_audio(file: UploadFile = File(...)):
         # Read the file contents
         file_contents = await file.read()
 
-        # Perform diarization
-        diar_df = diarize(file_contents)
+        # Perform diarization if do_diarize is True
+        diar_df = None
+        if do_diarize:
+            diar_df = diarize(file_contents)
 
         # Perform transcription
-        transcript = transcribe_audio_file(file_contents, diar_df.to_dict(orient='records'))
+        transcript = transcribe_audio_file(file_contents, diar_df.to_dict(orient='records') if diar_df is not None and not diar_df.empty else None, do_diarize=do_diarize)
 
         return JSONResponse(content=transcript)
 

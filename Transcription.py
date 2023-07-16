@@ -5,7 +5,7 @@ import torch
 import librosa
 import noisereduce as nr
 
-def transcribe_audio_file(audio_stream, diarization_result, audio_id=None, timestamp=None):
+def transcribe_audio_file(audio_stream, diarization_result, audio_id=None, timestamp=None, do_diarize=True, chunk_size_sec=5):
     # Check if a GPU is available and if not, use a CPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -26,28 +26,47 @@ def transcribe_audio_file(audio_stream, diarization_result, audio_id=None, times
     # Prepare the transcript JSON object
     transcript_json = []
 
-    # Process the audio in chunks based on diarization result
-    for segment in diarization_result:
-        start_sample = int(segment["sent_start"] * samplerate)
-        end_sample = int(segment["sent_end"] * samplerate)
-        chunk = data[start_sample:end_sample]
+    if do_diarize:
+        # Process the audio in chunks based on diarization result
+        for segment in diarization_result:
+            start_sample = int(segment["sent_start"] * samplerate)
+            end_sample = int(segment["sent_end"] * samplerate)
+            chunk = data[start_sample:end_sample]
 
-        # Transcribe the audio chunk directly without involving dataset splits
-        input_features = processor(chunk, sampling_rate=samplerate, return_tensors="pt").input_features.to(device)
+            # Process this chunk
+            transcript_chunk = transcribe_chunk(processor, model, device, chunk, samplerate, segment["Speaker"], audio_id, timestamp)
+            transcript_json.extend(transcript_chunk)
+    else:
+        # Without diarization, chunk the audio by fixed time segments
+        total_samples = len(data)
+        chunk_size_samples = chunk_size_sec * samplerate
+        for start_sample in range(0, total_samples, chunk_size_samples):
+            end_sample = min(start_sample + chunk_size_samples, total_samples)
+            chunk = data[start_sample:end_sample]
 
-        # Generate token ids
-        predicted_ids = model.generate(input_features)
-
-        # Decode token ids to text
-        transcription = processor.batch_decode(predicted_ids.cpu(), skip_special_tokens=True, clean_up_tokenization_spaces=True)
-
-        # Append the transcriptions for this chunk
-        for t in transcription:
-            transcript_json.append({
-                "audio_id": audio_id,        # ID or name of the audio stream (optional)
-                "timestamp": timestamp,      # Timestamp of the audio stream (optional)
-                "Speaker": segment["Speaker"], # Speaker for this segment
-                "transcription": t           # Transcribed text for the segment
-            })
+            # Process this chunk
+            transcript_chunk = transcribe_chunk(processor, model, device, chunk, samplerate, "Unknown", audio_id, timestamp)
+            transcript_json.extend(transcript_chunk)
 
     return transcript_json
+
+
+def transcribe_chunk(processor, model, device, chunk, samplerate, speaker, audio_id, timestamp):
+    # Transcribe the audio chunk directly without involving dataset splits
+    input_features = processor(chunk, sampling_rate=samplerate, return_tensors="pt").input_features.to(device)
+
+    # Generate token ids
+    predicted_ids = model.generate(input_features)
+
+    # Decode token ids to text
+    transcriptions = processor.batch_decode(predicted_ids.cpu(), skip_special_tokens=True, clean_up_tokenization_spaces=True)
+
+    # Append the transcriptions for this chunk
+    transcript_chunk = [{
+        "audio_id": audio_id,        # ID or name of the audio stream (optional)
+        "timestamp": timestamp,      # Timestamp of the audio stream (optional)
+        "Speaker": speaker,          # Speaker for this segment
+        "transcription": t           # Transcribed text for the segment
+    } for t in transcriptions]
+
+    return transcript_chunk
