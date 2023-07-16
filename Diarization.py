@@ -1,8 +1,7 @@
 import pandas as pd
 from pyannote.audio import Pipeline, Audio
 import tempfile
-import soundfile as sf
-from io import BytesIO
+
 
 def diarize(stream):
     # Save the audio_data to a temporary .wav file
