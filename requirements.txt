@@ -8,6 +8,3 @@ soundfile
 librosa
 noisereduce
 numpy==1.21.0
-
-
-
