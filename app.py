@@ -58,3 +58,8 @@ async def transcribe_audio(
     except Exception as e:
         tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
         raise HTTPException(status_code=500, detail="".join(tb_str))
+    
+@app.get("/status")
+async def read_status():
+    return {"status": "OK"}
+
