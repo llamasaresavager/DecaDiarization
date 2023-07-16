@@ -5,7 +5,6 @@ from pydantic import BaseModel
 import traceback
 from Diarization import diarize
 from Transcription import transcribe_audio_file
-import json
 
 class Segment(BaseModel):
     Speaker: str
