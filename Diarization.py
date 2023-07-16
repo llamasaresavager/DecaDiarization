@@ -8,19 +8,18 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-
 def diarize(stream):
     try:
         with tempfile.NamedTemporaryFile(delete=True, suffix=".wav") as temp_file:
             temp_file.write(stream)
             
-            huffingface_auth_token = os.environ.get("HUFFINGFACE_AUTH_TOKEN")
-            if not huffingface_auth_token:
-                raise Exception("Environment variable HUFFINGFACE_AUTH_TOKEN is not set")
+            HUFFINGFACE_API_KEY = os.environ.get("HUFFINGFACE_API_KEY")
+            if not HUFFINGFACE_API_KEY:
+                raise Exception("Environment variable HUFFINGFACE_API_KEY is not set")
             
             pipeline = Pipeline.from_pretrained(
                 "pyannote/speaker-diarization",
-                use_auth_token=huffingface_auth_token
+                use_auth_token=HUFFINGFACE_API_KEY
             )
 
             diarization = pipeline(temp_file.name)

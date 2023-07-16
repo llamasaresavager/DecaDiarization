@@ -1,4 +1,6 @@
+import os
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.params import Form
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 from pydantic import BaseModel
@@ -20,8 +22,8 @@ app = FastAPI()
 transcriber = Transcriber()
 
 def validate_file_type(file: UploadFile):
-    if file.content_type != "audio/wav":
-        raise HTTPException(status_code=400, detail="File must be a .wav file")
+    if file.filename.split(".")[-1] not in ["wav"]:
+        raise HTTPException(status_code=400, detail="Invalid file type")
 
 @app.post("/diarize", response_model=List[Segment])
 async def diarization(file: UploadFile = File(...)):
@@ -39,9 +41,13 @@ async def diarization(file: UploadFile = File(...)):
 async def transcribe_audio(
     file: UploadFile = File(...),
     do_diarize: Optional[bool] = True,
+    huggingface_api_key: Optional[str] = Form(None),  # Include the Hugging Face API key as an optional form parameter
 ):
     try:
         validate_file_type(file)
+
+        if huggingface_api_key:  # If the API key is provided, set it as an environment variable
+            os.environ['HUGGINGFACE_API_KEY'] = huggingface_api_key
 
         file_contents = await file.read()
 
