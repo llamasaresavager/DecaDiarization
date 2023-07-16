@@ -1,24 +1,35 @@
-from fastapi import FastAPI, UploadFile, HTTPException
-from tempfile import NamedTemporaryFile
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import JSONResponse
 from typing import List
+from pydantic import BaseModel
+import traceback
+
+# Import the function from Diarization.py
 from Diarization import diarize
+
+class Segment(BaseModel):
+    Speaker: str
+    sent_start: float
+    sent_end: float
 
 app = FastAPI()
 
-@app.post("/diarize")
-async def diarize_audio(files: List[UploadFile]):
-    if len(files) != 1:
-        raise HTTPException(status_code=400, detail="Exactly one file should be provided.")
+@app.post("/diarize", response_model=List[Segment])
+async def diarization(file: UploadFile = File(...)):
+    try:
+        # Ensure the file type is correct
+        if file.content_type != "audio/wav":
+            raise HTTPException(status_code=400, detail="File must be a .wav file")
 
-    file = files[0]
-    if file.content_type != "audio/wav":
-        raise HTTPException(status_code=400, detail="Only WAV files are supported.")
-    
-    with file.file as fx:
-        fx.seek(0)
-        # x= fx.read(10)
-        # diarization_result = x
-        # Perform diarization on the temporary file stream
-        diarization_result = diarize(stream=fx)
+        # Perform diarization
+        diar_df = diarize(await file.read())
 
-    return diarization_result
+        # Convert the DataFrame to a list of dicts
+        diar_list = diar_df.to_dict(orient='records')
+
+        return JSONResponse(content=diar_list)
+
+    except Exception as e:
+        # Capture the full exception traceback and raise as HTTPException
+        tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
+        raise HTTPException(status_code=500, detail="".join(tb_str))
