@@ -5,12 +5,16 @@ from pydantic import BaseModel
 import traceback
 from Diarization import diarize
 from Transcription import transcribe_audio_file
-import json
 
 class Segment(BaseModel):
     Speaker: str
     sent_start: float
     sent_end: float
+
+class Transcript(BaseModel):
+    audio_id: str
+    timestamp: float
+    transcription: str
 
 app = FastAPI()
 
@@ -35,19 +39,21 @@ async def diarization(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="".join(tb_str))
 
 
-@app.post("/transcribe", response_model=List[Segment])
+@app.post("/transcribe", response_model=List[Transcript])
 async def transcribe_audio(file: UploadFile = File(...)):
     try:
         # Ensure the file type is correct
         if file.content_type != "audio/wav":
             raise HTTPException(status_code=400, detail="File must be a .wav file")
 
-        # Load diarization result from the json file
-        with open('xdiart.json', 'r') as f:
-            diarization_result = json.load(f)
+        # Read the file contents
+        file_contents = await file.read()
+
+        # Perform diarization
+        diar_df = diarize(file_contents)
 
         # Perform transcription
-        transcript = transcribe_audio_file(await file.read(), diarization_result)
+        transcript = transcribe_audio_file(file_contents, diar_df.to_dict(orient='records'))
 
         return JSONResponse(content=transcript)
 
