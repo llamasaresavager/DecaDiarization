@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import traceback
 from Diarization import diarize
 from Transcription import transcribe_audio_file
+import json
 
 class Segment(BaseModel):
     Speaker: str
@@ -41,8 +42,12 @@ async def transcribe_audio(file: UploadFile = File(...)):
         if file.content_type != "audio/wav":
             raise HTTPException(status_code=400, detail="File must be a .wav file")
 
+        # Load diarization result from the json file
+        with open('xdiart.json', 'r') as f:
+            diarization_result = json.load(f)
+
         # Perform transcription
-        transcript = transcribe_audio_file(await file.read())
+        transcript = transcribe_audio_file(await file.read(), diarization_result)
 
         return JSONResponse(content=transcript)
 

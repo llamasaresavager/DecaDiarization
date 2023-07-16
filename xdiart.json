@@ -1,0 +1,37 @@
+[
+    {
+        "Speaker": "SPEAKER_01",
+        "sent_start": 0.4978125,
+        "sent_end": 24.6121875
+    },
+    {
+        "Speaker": "SPEAKER_00",
+        "sent_start": 25.337812500000002,
+        "sent_end": 25.7765625
+    },
+    {
+        "Speaker": "SPEAKER_01",
+        "sent_start": 28.5440625,
+        "sent_end": 33.43781250000001
+    },
+    {
+        "Speaker": "SPEAKER_00",
+        "sent_start": 33.9440625,
+        "sent_end": 35.00718750000001
+    },
+    {
+        "Speaker": "SPEAKER_01",
+        "sent_start": 34.315312500000005,
+        "sent_end": 38.854687500000004
+    },
+    {
+        "Speaker": "SPEAKER_00",
+        "sent_start": 40.2384375,
+        "sent_end": 56.860312500000006
+    },
+    {
+        "Speaker": "SPEAKER_01",
+        "sent_start": 42.07781250000001,
+        "sent_end": 59.45906250000001
+    }
+]
