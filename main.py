@@ -1,15 +1,27 @@
 import subprocess
+import threading
+import time
 
-def run_fastapi():
-    subprocess.run(["uvicorn", "app:app", "--reload"])
+FASTAPI_CMD = ["uvicorn", "app:app", "--reload"]
+UI_CMD = ["streamlit", "run", "ui.py"]
 
-def run_ui():
-    subprocess.run(["streamlit", "run", "ui.py"])
+def run_process(cmd):
+    try:
+        subprocess.check_call(cmd)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to execute command: {e.cmd}. Exit status: {e.returncode}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {str(e)}")
 
 if __name__ == "__main__":
-    import threading
+    fastapi_thread = threading.Thread(target=run_process, args=(FASTAPI_CMD,))
+    ui_thread = threading.Thread(target=run_process, args=(UI_CMD,))
 
-    fastapi_thread = threading.Thread(target=run_fastapi)
     fastapi_thread.start()
+    ui_thread.start()
 
-    run_ui()
+    try:
+        while True:  # keep the main thread alive to allow for manual interrupt
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Stopping services...")

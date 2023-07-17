@@ -1,10 +1,12 @@
+import os
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.params import Form
 from fastapi.responses import JSONResponse
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
-import traceback
 from Diarization import diarize
-from Transcription import transcribe_audio_file
+from Transcription import Transcriber
+import traceback
 
 class Segment(BaseModel):
     Speaker: str
@@ -17,47 +19,52 @@ class Transcript(BaseModel):
     transcription: str
 
 app = FastAPI()
+transcriber = Transcriber()
+
+def validate_file_type(file: UploadFile):
+    if file.filename.split(".")[-1] not in ["wav"]:
+        raise HTTPException(status_code=400, detail="Invalid file type")
 
 @app.post("/diarize", response_model=List[Segment])
 async def diarization(file: UploadFile = File(...)):
     try:
-        # Ensure the file type is correct
-        if file.content_type != "audio/wav":
-            raise HTTPException(status_code=400, detail="File must be a .wav file")
-
-        # Perform diarization
+        validate_file_type(file)
         diar_df = diarize(await file.read())
-
-        # Convert the DataFrame to a list of dicts
         diar_list = diar_df.to_dict(orient='records')
-
         return JSONResponse(content=diar_list)
 
     except Exception as e:
-        # Capture the full exception traceback and raise as HTTPException
         tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
         raise HTTPException(status_code=500, detail="".join(tb_str))
 
-
 @app.post("/transcribe", response_model=List[Transcript])
-async def transcribe_audio(file: UploadFile = File(...)):
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    do_diarize: Optional[bool] = True,
+    huggingface_api_key: Optional[str] = Form(None),  # Include the Hugging Face API key as an optional form parameter
+):
     try:
-        # Ensure the file type is correct
-        if file.content_type != "audio/wav":
-            raise HTTPException(status_code=400, detail="File must be a .wav file")
+        validate_file_type(file)
 
-        # Read the file contents
+        if huggingface_api_key:  # If the API key is provided, set it as an environment variable
+            os.environ['HUGGINGFACE_API_KEY'] = huggingface_api_key
+
         file_contents = await file.read()
 
-        # Perform diarization
-        diar_df = diarize(file_contents)
+        diar_df = diarize(file_contents) if do_diarize else None
 
-        # Perform transcription
-        transcript = transcribe_audio_file(file_contents, diar_df.to_dict(orient='records'))
+        transcript = transcriber.transcribe_audio_file(
+            file_contents,
+            diar_df.to_dict(orient='records') if diar_df is not None and not diar_df.empty else None,
+            do_diarize=do_diarize
+        )
 
         return JSONResponse(content=transcript)
 
     except Exception as e:
-        # Capture the full exception traceback and raise as HTTPException
         tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
         raise HTTPException(status_code=500, detail="".join(tb_str))
+    
+@app.get("/status")
+async def read_status():
+    return {"status": "OK"}
