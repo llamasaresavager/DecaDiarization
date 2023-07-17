@@ -4,22 +4,35 @@ from librosa.effects import trim
 from librosa.util import normalize
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 from torch import cuda, device
+from concurrent.futures import ProcessPoolExecutor
 import io
 import numpy as np
 import logging
+import os
 
 
 logging.basicConfig(level=logging.INFO)
 
+HUGGINGFACE_API_KEY = os.environ.get("HUGGINGFACE_API_KEY")
+MIN_CHUNK_SIZE_SEC = 2  # Set the minimum chunk size
 
 class Transcriber:
     CHUNK_SIZE_SEC = 5
     MODEL_NAME = "openai/whisper-large-v2"
+    
 
     def __init__(self):
         """
         Initialize the Transcriber with the appropriate model and processor.
         """
+
+        if not HUGGINGFACE_API_KEY:
+            raise Exception("Environment variable HUGGINGFACE_API_KEY is not set")
+
+        # self.pipeline = Pipeline.from_pretrained(
+        #     "pyannote/speaker-diarization",
+        #     use_auth_token=HUGGINGFACE_API_KEY
+        # )
         self.device = device("cuda" if cuda.is_available() else "cpu")
         self.processor = WhisperProcessor.from_pretrained(self.MODEL_NAME)
         self.model = WhisperForConditionalGeneration.from_pretrained(self.MODEL_NAME).to(self.device)
@@ -68,11 +81,21 @@ class Transcriber:
         return transcript_chunk
 
     def _process_diarization(self, data, samplerate, diarization_result, audio_id, timestamp):
+        MIN_CHUNK_SIZE_SEC = 2  # Set the minimum chunk size
         transcript_json = []
+        chunk_buffer = None
         for segment in diarization_result:
             start_sample = int(segment["sent_start"] * samplerate)
             end_sample = int(segment["sent_end"] * samplerate)
             chunk = data[start_sample:end_sample]
+            duration_sec = (end_sample - start_sample) / samplerate
+            if duration_sec < MIN_CHUNK_SIZE_SEC:
+                if chunk_buffer is not None:
+                    chunk = np.concatenate((chunk_buffer, chunk))
+                    chunk_buffer = None
+                else:
+                    chunk_buffer = chunk
+                    continue
             transcript_chunk = self._transcribe_chunk(chunk, samplerate, segment["Speaker"], audio_id, timestamp)
             transcript_json.extend(transcript_chunk)
         return transcript_json

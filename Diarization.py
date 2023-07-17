@@ -7,13 +7,13 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+HUGGINGFACE_API_KEY = os.environ.get("HUGGINGFACE_API_KEY")
 
 def diarize(stream):
     try:
         with tempfile.NamedTemporaryFile(delete=True, suffix=".wav") as temp_file:
             temp_file.write(stream)
             
-            HUGGINGFACE_API_KEY = os.environ.get("HUGGINGFACE_API_KEY")
             if not HUGGINGFACE_API_KEY:
                 raise Exception("Environment variable HUGGINGFACE_API_KEY is not set")
             
