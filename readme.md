@@ -11,7 +11,7 @@ Our project is structured with the following core components:
 - `Diarization.py`: This file encapsulates the diarization process, which includes processing an audio stream and extracting speaker segments.
 - `Transcription.py`: This script is responsible for transcribing speaker segments into text.
 - `app.py`: Here, you'll find the FastAPI application defined, along with the endpoints responsible for handling audio diarization and transcription.
-- `streamlit_app.py`: This file houses the Streamlit user interface, which enables file uploads, request handling, and displaying results.
+- `ui.py`: This file houses the Streamlit user interface, which enables file uploads, request handling, and displaying results.
 - `main.py`: This is the primary script that runs both the FastAPI server and the Streamlit UI.
 - `requirements.txt`: This contains all the Python packages required for running the project.
 - `README.md`: The file you're currently reading, offering comprehensive information about the project and instructions for its execution.
