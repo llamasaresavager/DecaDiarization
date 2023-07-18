@@ -20,10 +20,10 @@ Our project is structured with the following core components:
 
 To install and set up this project on your local machine, follow these steps:
 
-1. Create a new Conda environment with Python 3.7:
+1. Create a new Conda environment with Python 3.8.17:
 
     ```bash
-    conda create -n myenv python=3.7
+    conda create -n myenv python=3.8.17
     ```
 
 2. Activate the newly created Conda environment:
