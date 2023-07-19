@@ -60,7 +60,7 @@ class Transcriber:
             logging.error(f"Error during preprocessing: {e}")
             raise
 
-    def _transcribe_chunk(self, chunk: np.array, samplerate: int, speaker: str, audio_id: str, timestamp: str) -> list:
+    def _transcribe_chunk(self, chunk: np.array, samplerate: int, speaker: str, audio_id: str, start_time: float, end_time: float) -> list:
         """
         Transcribe an audio chunk using the Whisper ASR model.
 
@@ -69,7 +69,8 @@ class Transcriber:
             samplerate (int): The samplerate of the audio chunk.
             speaker (str): The speaker of the audio chunk.
             audio_id (str): An ID for the audio chunk.
-            timestamp (str): A timestamp for the audio chunk.
+            start_time (float): The start time of the audio chunk.
+            end_time (float): The end time of the audio chunk.
 
         Returns:
             list: The transcription results.
@@ -77,8 +78,9 @@ class Transcriber:
         input_features = self.processor(chunk, sampling_rate=samplerate, return_tensors="pt").input_features.to(self.device)
         predicted_ids = self.model.generate(input_features)
         transcriptions = self.processor.batch_decode(predicted_ids.cpu(), skip_special_tokens=True, clean_up_tokenization_spaces=True)
-        transcript_chunk = [{"audio_id": audio_id, "timestamp": timestamp, "Speaker": speaker, "transcription": t} for t in transcriptions]
+        transcript_chunk = [{"audio_id": audio_id, "start_time": start_time, "end_time": end_time, "Speaker": speaker, "transcription": t} for t in transcriptions]
         return transcript_chunk
+
 
     def _process_diarization(self, data, samplerate, diarization_result, audio_id, timestamp):
         MIN_CHUNK_SIZE_SEC = 2  # Set the minimum chunk size
@@ -89,6 +91,8 @@ class Transcriber:
             end_sample = int(segment["sent_end"] * samplerate)
             chunk = data[start_sample:end_sample]
             duration_sec = (end_sample - start_sample) / samplerate
+            start_time = start_sample / samplerate
+            end_time = end_sample / samplerate
             if duration_sec < MIN_CHUNK_SIZE_SEC:
                 if chunk_buffer is not None:
                     chunk = np.concatenate((chunk_buffer, chunk))
@@ -96,18 +100,20 @@ class Transcriber:
                 else:
                     chunk_buffer = chunk
                     continue
-            transcript_chunk = self._transcribe_chunk(chunk, samplerate, segment["Speaker"], audio_id, timestamp)
+            transcript_chunk = self._transcribe_chunk(chunk, samplerate, segment["Speaker"], audio_id, start_time, end_time)
             transcript_json.extend(transcript_chunk)
         return transcript_json
 
-    def _process_without_diarization(self, data, samplerate, chunk_size_sec, audio_id, timestamp):
+    def _process_without_diarization(self, data, samplerate, chunk_size_sec, audio_id):
         transcript_json = []
         total_samples = len(data)
         chunk_size_samples = chunk_size_sec * samplerate
         for start_sample in range(0, total_samples, chunk_size_samples):
             end_sample = min(start_sample + chunk_size_samples, total_samples)
             chunk = data[start_sample:end_sample]
-            transcript_chunk = self._transcribe_chunk(chunk, samplerate, "Unknown", audio_id, timestamp)
+            start_time = start_sample / samplerate
+            end_time = end_sample / samplerate
+            transcript_chunk = self._transcribe_chunk(chunk, samplerate, "Unknown", audio_id, start_time, end_time)
             transcript_json.extend(transcript_chunk)
         return transcript_json
 
