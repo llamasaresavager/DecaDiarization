@@ -1,21 +1,3 @@
-# Audio Diarization and Transcription with FastAPI
-
-Welcome to our repository! This project utilizes Python to perform audio diarization and transcription on a streaming WAV file. The application is built using FastAPI and offers a user-friendly interface developed with Streamlit.
-
-![Streamlit UI](./images/ui.png)
-
-## Project Structure
-
-Our project is structured with the following core components:
-
-- `Diarization.py`: This file encapsulates the diarization process, which includes processing an audio stream and extracting speaker segments.
-- `Transcription.py`: This script is responsible for transcribing speaker segments into text.
-- `app.py`: Here, you'll find the FastAPI application defined, along with the endpoints responsible for handling audio diarization and transcription.
-- `ui.py`: This file houses the Streamlit user interface, which enables file uploads, request handling, and displaying results.
-- `main.py`: This is the primary script that runs both the FastAPI server and the Streamlit UI.
-- `requirements.txt`: This contains all the Python packages required for running the project.
-- `README.md`: The file you're currently reading, offering comprehensive information about the project and instructions for its execution.
-
 ## Installation
 
 To install and set up this project on your local machine, follow these steps:
@@ -44,7 +26,25 @@ To install and set up this project on your local machine, follow these steps:
     cd DecaDiarization
     ```
 
-5. Install all the necessary Python packages from the `requirements.txt`:
+5. Rename the `.env.sample` file to `.env` and update it with your configuration:
+
+    ```bash
+    mv .env.sample .env
+    ```
+
+6. Register for a Hugging Face API key by visiting [https://huggingface.co/join](https://huggingface.co/join). After obtaining your API key, add it to the `.env` file as follows:
+
+    ```
+    HUGGING_FACE_API_KEY=YOUR_HUGGING_FACE_API_KEY
+    ```
+
+7. Before using the pyannote/speaker-diarization model from Hugging Face, you need to agree to the terms and conditions specified by the model. The model requires you to share your contact information to access it. This repository is publicly accessible, but you have to accept the conditions to access its files and content.
+
+    The collected information will help acquire a better knowledge of pyannote.audio userbase and help its maintainers apply for grants to improve it further. If you are an academic researcher, please cite the relevant papers in your own publications using the model. If you work for a company, please consider contributing back to pyannote.audio development (e.g. through unrestricted gifts). We also provide scientific consulting services around speaker diarization and machine listening.
+
+    For more information and to accept the terms, please visit the pyannote/speaker-diarization model page on Hugging Face: [https://huggingface.co/pyannote/speaker-diarization](https://huggingface.co/pyannote/speaker-diarization).
+
+8. Install all the necessary Python packages from the `requirements.txt`:
 
     ```bash
     pip install -r requirements.txt
