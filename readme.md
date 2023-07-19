@@ -1,3 +1,23 @@
+# Audio Diarization and Transcription with FastAPI
+
+Welcome to our repository! This project utilizes Python to perform audio diarization and transcription on a streaming WAV file. The application is built using FastAPI and offers a user-friendly interface developed with Streamlit.
+
+![Streamlit UI](./images/ui.png)
+
+## Project Structure
+
+Our project is structured with the following core components:
+
+- `Diarization.py`: This file encapsulates the diarization process, which includes processing an audio stream and extracting speaker segments.
+- `Transcription.py`: This script is responsible for transcribing speaker segments into text.
+- `app.py`: Here, you'll find the FastAPI application defined, along with the endpoints responsible for handling audio diarization and transcription.
+- `ui.py`: This file houses the Streamlit user interface, which enables file uploads, request handling, and displaying results.
+- `main.py`: This is the primary script that runs both the FastAPI server and the Streamlit UI.
+- `requirements.txt`: This contains all the Python packages required for running the project.
+- `README.md`: The file you're currently reading, offering comprehensive information about the project and instructions for its execution.
+
+Sure! Let's add the additional installation instructions and terms for accessing the Hugging Face API and the pyannote/speaker-diarization model to the README:
+
 ## Installation
 
 To install and set up this project on your local machine, follow these steps:
@@ -63,6 +83,14 @@ To use this project, follow these steps:
 This command will initiate the FastAPI server and launch the Streamlit UI. Now, you can use the UI to upload a WAV file, select a task (either diarization or transcription), and choose a destination for the output file. The chosen task will process the uploaded file, and the results will be displayed in the Streamlit application and also saved to the specified destination.
 
 Please ensure to have a valid WAV file for diarization and make adjustments to the request accordingly.
+
+## Contact Information
+
+I am currently job searching and if you have any inquiries or would like to get in touch, can be reached at:
+
+Email: trevor@pertainium.com
+
+Feel free to reach out if you have any questions or opportunities related to this project or any other relevant matters.
 
 ## Example Result
 
