@@ -15,8 +15,11 @@ class Segment(BaseModel):
 
 class Transcript(BaseModel):
     audio_id: str
-    timestamp: float
+    start_time: float
+    end_time: float
+    Speaker: str
     transcription: str
+
 
 app = FastAPI()
 transcriber = Transcriber()
